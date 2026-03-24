@@ -6,8 +6,9 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
-import { Share2, Printer, X, ArrowLeft, User, Calendar, Phone, Users, ClipboardCheck, Brain, Activity, Heart, Target, History } from 'lucide-react';
+import { Share2, Printer, X, ArrowLeft, User, Calendar, Phone, Users, ClipboardCheck, Brain, Activity, Heart, Target, History, Copy } from 'lucide-react';
 import { PORTAGE_ITEMS } from '../constants';
+import { toast } from 'sonner';
 
 const AREA_COLORS: Record<string, string> = {
   'Socialização': '#3b82f6',
@@ -59,6 +60,10 @@ export function FullReport({ patient, onClose }: { patient: Patient, onClose: ()
   };
 
   const handleShare = async () => {
+    const iarTotal = latestIar ? Object.values(latestIar.items).reduce((acc, val) => acc + val, 0) : 0;
+    const iarMax = 6;
+    const iarPercent = ((iarTotal / iarMax) * 100).toFixed(1);
+
     const text = `
 Relatório Psicopedagógico - ${patient.name}
 Data: ${new Date().toLocaleDateString('pt-BR')}
@@ -70,9 +75,10 @@ Contato: ${patient.contact}
 CID: ${patient.cid}
 
 Resumo da Avaliação:
-- Portage: ${latestPortage ? 'Realizado' : 'Não realizado'}
-- IAR: ${latestIar ? 'Realizado' : 'Não realizado'}
-- EOCA: ${latestEoca ? 'Concluído' : 'Pendente'}
+- IAR: ${latestIar ? `Realizado (${iarPercent}% de prontidão)` : 'Não realizado'}
+- Portage: ${latestPortage ? 'Realizado (Avaliação global concluída)' : 'Não realizado'}
+- EOCA: ${latestEoca ? 'Concluído (Vínculo com aprendizagem avaliado)' : 'Pendente'}
+- PTI: ${latestPti ? 'Plano Terapêutico definido' : 'Não definido'}
 
 Profissional: ${profName}
 ${profSpecialty} ${profCRP}
@@ -87,16 +93,20 @@ Documento gerado pelo Caderno Psicopedagógico Avançado.
           text: text,
           url: window.location.href
         });
+        toast.success('Relatório compartilhado com sucesso!');
       } else {
         await navigator.clipboard.writeText(text);
-        alert('Relatório copiado para a área de transferência! Você pode colar no WhatsApp ou E-mail.');
+        toast.success('Relatório copiado para a área de transferência!', {
+          description: 'Você pode colar no WhatsApp ou E-mail.'
+        });
       }
     } catch (err) {
       console.error('Erro ao compartilhar:', err);
       try {
         await navigator.clipboard.writeText(text);
-        alert('Relatório copiado para a área de transferência!');
+        toast.success('Relatório copiado para a área de transferência!');
       } catch (clipErr) {
+        toast.error('Não foi possível copiar o relatório.');
         console.error('Erro ao copiar:', clipErr);
       }
     }
@@ -121,13 +131,42 @@ Documento gerado pelo Caderno Psicopedagógico Avançado.
   })) : [];
 
   const handlePrint = () => {
-    window.print();
+    toast.info('Preparando relatório para impressão...', { duration: 2000 });
+    setTimeout(() => {
+      window.print();
+    }, 500);
   };
 
   return (
-    <div className="fixed inset-0 bg-white z-[100] overflow-auto p-8 print:p-0">
+    <div className="fixed inset-0 bg-white z-[100] overflow-auto p-8 print:p-0 print:static print:overflow-visible">
       <div className="max-w-4xl mx-auto space-y-12 pb-20 print:pb-0">
         
+        {/* Top Controls (Mobile Friendly) */}
+        <div className="flex justify-between items-center mb-8 print:hidden">
+          <button 
+            onClick={onClose}
+            className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+          >
+            <ArrowLeft size={24} className="text-slate-600" />
+          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={handleShare}
+              className="p-3 bg-brand-50 text-brand-600 rounded-2xl hover:bg-brand-100 transition-all"
+              title="Compartilhar"
+            >
+              <Share2 size={20} />
+            </button>
+            <button 
+              onClick={handlePrint}
+              className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all"
+              title="Salvar"
+            >
+              <Printer size={20} />
+            </button>
+          </div>
+        </div>
+
         {/* Header */}
         <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6">
           <div className="space-y-1">

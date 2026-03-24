@@ -4,6 +4,7 @@ import { db } from '../db';
 import { Search, Plus, ChevronRight, Users, Trash2 } from 'lucide-react';
 import { calculateAge } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 
 export function PatientListView({ onSelectPatient, onAddPatient }: { onSelectPatient: (id: number) => void, onAddPatient: () => void }) {
   const [search, setSearch] = useState('');
@@ -27,9 +28,10 @@ export function PatientListView({ onSelectPatient, onAddPatient }: { onSelectPat
         await db.evolutions.where('patientId').equals(patientToDelete.id).delete();
       });
       setPatientToDelete(null);
+      toast.success('Paciente excluído com sucesso!');
     } catch (error) {
       console.error('Erro ao excluir paciente:', error);
-      alert('Erro ao excluir paciente.');
+      toast.error('Erro ao excluir paciente.');
     }
   };
 

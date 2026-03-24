@@ -5,6 +5,7 @@ import { HUMANIZZARE_ITEMS } from '../../constants';
 import { cn, formatDate } from '../../lib/utils';
 import { Save, Plus, Info, CheckCircle2, Circle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 
 const SCORE_DESCRIPTIONS: Record<number, { label: string, color: string }> = {
   0: { label: 'Dependência Total', color: 'bg-red-100 text-red-700' },
@@ -22,7 +23,7 @@ export function HumanizzareTab({ patientId }: { patientId: number }) {
 
   const handleSave = async () => {
     if (Object.keys(scores).length < HUMANIZZARE_ITEMS.length) {
-      alert('Por favor, avalie todos os itens antes de salvar.');
+      toast.warning('Por favor, avalie todos os itens antes de salvar.');
       return;
     }
     await db.humanizzare.add({
@@ -30,6 +31,7 @@ export function HumanizzareTab({ patientId }: { patientId: number }) {
       date: Date.now(),
       scores
     });
+    toast.success('Avaliação salva com sucesso!');
     setIsEditing(false);
     setScores({});
   };

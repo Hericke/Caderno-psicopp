@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { ArrowLeft, Printer, MessageSquare, Trash2, Camera, User, Activity, ClipboardCheck, Brain, Heart, Target, History, Calendar, Users, Share2, X } from 'lucide-react';
 import { cn, calculateAge, formatDate } from '../lib/utils';
+import { toast } from 'sonner';
 import { PortageTab } from './tabs/PortageTab';
 import { IARTab } from './tabs/IARTab';
 import { EOCATab } from './tabs/EOCATab';
@@ -78,6 +79,12 @@ Responsável: ${patient.parents}
 Contato: ${patient.contact}
 CID: ${patient.cid}
 
+Resumo da Avaliação:
+- IAR: ${iar ? 'Realizado' : 'Não realizado'}
+- Portage: ${portage ? 'Realizado' : 'Não realizado'}
+- EOCA: ${eoca ? 'Concluído' : 'Pendente'}
+- PTI: ${pti ? 'Plano Terapêutico definido' : 'Não definido'}
+
 Profissional: ${profName}
 ${profSpecialty} ${profCRP}
 
@@ -91,19 +98,30 @@ Documento gerado pelo Caderno Psicopedagógico Avançado.
           text: shareText,
           url: window.location.href
         });
+        toast.success('Relatório compartilhado com sucesso!');
       } else {
         await navigator.clipboard.writeText(shareText);
-        alert('Dados do relatório copiados para a área de transferência! Você pode colar no WhatsApp ou E-mail.');
+        toast.success('Relatório copiado para a área de transferência!', {
+          description: 'Você pode colar no WhatsApp ou E-mail.'
+        });
       }
     } catch (err) {
       console.error('Erro ao compartilhar:', err);
       try {
         await navigator.clipboard.writeText(shareText);
-        alert('Dados do relatório copiados para a área de transferência!');
+        toast.success('Relatório copiado para a área de transferência!');
       } catch (clipErr) {
+        toast.error('Não foi possível copiar o relatório.');
         console.error('Erro ao copiar:', clipErr);
       }
     }
+  };
+
+  const handlePrint = () => {
+    toast.info('Preparando relatório para impressão...', { duration: 2000 });
+    setTimeout(() => {
+      window.print();
+    }, 500);
   };
 
   const tabs = [
@@ -138,7 +156,7 @@ Documento gerado pelo Caderno Psicopedagógico Avançado.
             <Share2 size={20} />
           </button>
           <button 
-            onClick={() => window.print()}
+            onClick={handlePrint}
             className="btn-primary flex items-center gap-2 px-4 py-2 text-sm shadow-lg shadow-brand-100"
           >
             <Printer size={18} />
@@ -184,10 +202,11 @@ Documento gerado pelo Caderno Psicopedagógico Avançado.
                       await db.pti.where('patientId').equals(patientId).delete();
                       await db.evolutions.where('patientId').equals(patientId).delete();
                     });
+                    toast.success('Paciente excluído com sucesso!');
                     onBack();
                   } catch (error) {
                     console.error('Erro ao excluir paciente:', error);
-                    alert('Erro ao excluir paciente. Por favor, tente novamente.');
+                    toast.error('Erro ao excluir paciente. Por favor, tente novamente.');
                   }
                 }}
                 className="flex-1 py-3 font-bold text-white bg-red-500 rounded-2xl hover:bg-red-600 transition-colors shadow-lg shadow-red-100"

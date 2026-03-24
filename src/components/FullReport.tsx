@@ -1,0 +1,505 @@
+import React from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, Patient } from '../db';
+import { formatDate, calculateAge, cn } from '../lib/utils';
+import { 
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+} from 'recharts';
+import { Share2, Printer, X, ArrowLeft, User, Calendar, Phone, Users, ClipboardCheck, Brain, Activity, Heart, Target, History } from 'lucide-react';
+import { PORTAGE_ITEMS } from '../constants';
+
+const AREA_COLORS: Record<string, string> = {
+  'Socialização': '#3b82f6',
+  'Linguagem': '#10b981',
+  'Autocuidados': '#f59e0b',
+  'Cognição': '#8b5cf6',
+  'Motor': '#ef4444'
+};
+
+const PTI_AREAS = [
+  { id: 'cognicao', label: 'Cognição', color: '#8b5cf6', desc: 'Processos de pensamento, memória e atenção.' },
+  { id: 'linguagem', label: 'Linguagem', color: '#10b981', desc: 'Comunicação verbal e não-verbal.' },
+  { id: 'socioemocional', label: 'Socioemocional', color: '#3b82f6', desc: 'Interação social e regulação emocional.' },
+  { id: 'psicomotricidade', label: 'Psicomotricidade', color: '#ef4444', desc: 'Coordenação motora e esquema corporal.' },
+  { id: 'autonomia', label: 'Autonomia', color: '#f59e0b', desc: 'Independência em atividades diárias.' },
+  { id: 'leitura_escrita', label: 'Leitura e Escrita', color: '#6366f1', desc: 'Alfabetização e letramento.' },
+  { id: 'raciocinio_logico', label: 'Raciocínio Lógico', color: '#f97316', desc: 'Habilidades matemáticas e resolução de problemas.' },
+];
+
+export function FullReport({ patient, onClose }: { patient: Patient, onClose: () => void }) {
+  const iar = useLiveQuery(() => db.iar.where('patientId').equals(patient.id!).toArray(), [patient.id]);
+  const portage = useLiveQuery(() => db.portage.where('patientId').equals(patient.id!).toArray(), [patient.id]);
+  const eoca = useLiveQuery(() => db.eoca.where('patientId').equals(patient.id!).toArray(), [patient.id]);
+  const pti = useLiveQuery(() => db.pti.where('patientId').equals(patient.id!).toArray(), [patient.id]);
+  const evolutions = useLiveQuery(() => db.evolutions.where('patientId').equals(patient.id!).toArray(), [patient.id]);
+  const settings = useLiveQuery(() => db.settings.toArray());
+
+  const latestIar = iar?.[iar.length - 1];
+  const latestPortage = portage?.[portage.length - 1];
+  const latestEoca = eoca?.[eoca.length - 1];
+  const latestPti = pti?.[pti.length - 1];
+  const profName = settings?.find(s => s.key === 'profName')?.value || 'Daniele Rodrigues';
+  const profSpecialty = settings?.find(s => s.key === 'profSpecialty')?.value || 'Psicopedagoga';
+  const profCRP = settings?.find(s => s.key === 'profCRP')?.value || '';
+
+  const calculatePortageID = (details: Record<string, number>, area: string) => {
+    const items = (PORTAGE_ITEMS as any)[area] || [];
+    if (items.length === 0) return 0;
+    const ageRanges = ['0-1', '1-2', '2-3', '3-4', '4-5', '5-6'];
+    let totalMonths = 0;
+    ageRanges.forEach(range => {
+      const rangeItems = items.filter((i: any) => i.ageRange === range);
+      if (rangeItems.length > 0) {
+        const rangePoints = rangeItems.reduce((acc: number, item: any) => acc + (details[item.id] || 0), 0);
+        totalMonths += (rangePoints / rangeItems.length) * 12;
+      }
+    });
+    return Math.round(totalMonths);
+  };
+
+  const handleShare = async () => {
+    const text = `
+Relatório Psicopedagógico - ${patient.name}
+Data: ${new Date().toLocaleDateString('pt-BR')}
+
+Paciente: ${patient.name}
+Idade: ${calculateAge(patient.birthDate)} anos
+Responsável: ${patient.parents}
+Contato: ${patient.contact}
+CID: ${patient.cid}
+
+Resumo da Avaliação:
+- Portage: ${latestPortage ? 'Realizado' : 'Não realizado'}
+- IAR: ${latestIar ? 'Realizado' : 'Não realizado'}
+- EOCA: ${latestEoca ? 'Concluído' : 'Pendente'}
+
+Profissional: ${profName}
+${profSpecialty} ${profCRP}
+
+Documento gerado pelo Caderno Psicopedagógico Avançado.
+    `.trim();
+
+    try {
+      if (navigator.share && /mobile/i.test(navigator.userAgent)) {
+        await navigator.share({
+          title: `Relatório - ${patient.name}`,
+          text: text,
+          url: window.location.href
+        });
+      } else {
+        await navigator.clipboard.writeText(text);
+        alert('Relatório copiado para a área de transferência! Você pode colar no WhatsApp ou E-mail.');
+      }
+    } catch (err) {
+      console.error('Erro ao compartilhar:', err);
+      try {
+        await navigator.clipboard.writeText(text);
+        alert('Relatório copiado para a área de transferência!');
+      } catch (clipErr) {
+        console.error('Erro ao copiar:', clipErr);
+      }
+    }
+  };
+
+  const iarData = latestIar ? [
+    { subject: 'Esquema Corporal', A: latestIar.items['esquema_corporal'] || 0, full: 1 },
+    { subject: 'Lateralidade', A: latestIar.items['lateralidade'] || 0, full: 1 },
+    { subject: 'Orientação Espacial', A: latestIar.items['orientacao_espacial'] || 0, full: 1 },
+    { subject: 'Orientação Temporal', A: latestIar.items['orientacao_temporal'] || 0, full: 1 },
+    { subject: 'Discriminação Visual', A: latestIar.items['discriminacao_visual'] || 0, full: 1 },
+    { subject: 'Discriminação Auditiva', A: latestIar.items['discriminacao_auditiva'] || 0, full: 1 },
+  ] : [];
+
+  const iarTotal = latestIar ? Object.values(latestIar.items).reduce((acc, val) => acc + val, 0) : 0;
+  const iarMax = 6; // Based on the 6 categories above
+
+  const portageData = latestPortage ? Object.entries(latestPortage.scores).map(([area, score]) => ({
+    area,
+    score,
+    color: AREA_COLORS[area] || '#cbd5e1'
+  })) : [];
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-white z-[100] overflow-auto p-8 print:p-0">
+      <div className="max-w-4xl mx-auto space-y-12 pb-20 print:pb-0">
+        
+        {/* Header */}
+        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold text-slate-900 uppercase tracking-tighter">Relatório Psicopedagógico</h1>
+            <p className="text-slate-500 font-medium italic">Documento Confidencial de Avaliação e Intervenção</p>
+          </div>
+          <div className="text-right">
+            <p className="font-bold text-slate-800">{profName}</p>
+            <p className="text-sm text-slate-500">{profSpecialty}</p>
+            <p className="text-sm text-slate-500">{profCRP}</p>
+          </div>
+        </div>
+
+        {/* Patient Info */}
+        <section className="grid grid-cols-2 gap-8 bg-slate-50 p-8 rounded-[2rem] border border-slate-100">
+          <div className="space-y-6">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Paciente</p>
+              <p className="text-2xl font-black text-slate-900">{patient.name}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Idade</p>
+                <p className="font-bold text-slate-700">{calculateAge(patient.birthDate)} anos</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">CID</p>
+                <p className="font-bold text-slate-700">{patient.cid || 'N/A'}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Responsável</p>
+              <p className="font-bold text-slate-700">{patient.parents || 'Não informado'}</p>
+            </div>
+          </div>
+          <div className="space-y-6">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Contato</p>
+              <p className="font-bold text-slate-700">{patient.contact || 'Não informado'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Escolaridade</p>
+              <p className="font-bold text-slate-700">{patient.schooling || 'Não informada'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Data do Relatório</p>
+              <p className="font-bold text-slate-700">{formatDate(Date.now())}</p>
+            </div>
+          </div>
+        </section>
+
+        {/* IAR Assessment */}
+        {latestIar && (
+          <section className="space-y-6 break-inside-avoid">
+            <div className="flex justify-between items-end border-b border-slate-100 pb-2">
+              <h2 className="text-xl font-black text-purple-600 uppercase tracking-tight">Protocolo IAR Adaptado</h2>
+              <p className="text-xs font-bold text-slate-400">Índice de Prontidão: {((iarTotal / iarMax) * 100).toFixed(1)}%</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div className="h-[350px] bg-white rounded-3xl border border-slate-50 p-4 shadow-sm">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={iarData}>
+                    <PolarGrid stroke="#e2e8f0" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fontWeight: 600, fill: '#64748b' }} />
+                    <Radar 
+                      name="IAR" 
+                      dataKey="A" 
+                      stroke="#8b5cf6" 
+                      fill="#8b5cf6" 
+                      fillOpacity={0.5} 
+                      strokeWidth={3}
+                      isAnimationActive={false}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-3">
+                  {iarData.map(item => (
+                    <div key={item.subject} className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">{item.subject}</p>
+                      <p className="text-sm font-black text-slate-700">{item.A === 1 ? 'Desenvolvido' : item.A === 0.5 ? 'Em Processo' : 'Necessita Estímulo'}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-purple-50 p-5 rounded-[1.5rem] border border-purple-100">
+                  <p className="text-xs font-bold text-purple-700 uppercase mb-2 tracking-widest">Informações Conclusivas</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    O Protocolo IAR avalia pré-requisitos fundamentais para a alfabetização. 
+                    A pontuação total de <strong>{iarTotal.toFixed(1)} de {iarMax}</strong> indica o nível de prontidão atual.
+                    {iarTotal >= 5 ? ' O paciente apresenta excelente prontidão para os processos de leitura e escrita.' : 
+                     iarTotal >= 3 ? ' O paciente apresenta prontidão parcial, necessitando de estímulos específicos em áreas de déficit.' : 
+                     ' O paciente necessita de intervenção intensiva nos pré-requisitos de alfabetização.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Portage Assessment */}
+        {latestPortage && (
+          <section className="space-y-6 break-inside-avoid">
+            <div className="flex justify-between items-end border-b border-slate-100 pb-2">
+              <h2 className="text-xl font-black text-blue-600 uppercase tracking-tight">Inventário Portage</h2>
+              <p className="text-xs font-bold text-slate-400">Avaliação do Desenvolvimento</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div className="h-[350px] bg-white rounded-3xl border border-slate-50 p-6 shadow-sm">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={portageData} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                    <XAxis type="number" domain={[0, 100]} hide />
+                    <YAxis 
+                      dataKey="area" 
+                      type="category" 
+                      width={100} 
+                      tick={{ fontSize: 11, fontWeight: 600, fill: '#64748b' }} 
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip 
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    />
+                    <Bar dataKey="score" radius={[0, 10, 10, 0]} barSize={24} isAnimationActive={false}>
+                      {portageData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {Object.entries(latestPortage.scores).map(([area, score]) => {
+                    const idMonths = calculatePortageID(latestPortage.details || {}, area);
+                    const cronoMonths = calculateAge(patient.birthDate) * 12;
+                    const delay = cronoMonths - idMonths;
+                    
+                    return (
+                      <div key={area} className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div className="flex justify-between items-center mb-1">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">{area}</p>
+                          <p className={cn(
+                            "text-[9px] font-bold uppercase px-2 py-0.5 rounded-full",
+                            delay > 12 ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"
+                          )}>
+                            ID: {idMonths}m
+                          </p>
+                        </div>
+                        <p className="text-lg font-black text-slate-700">{score}%</p>
+                        <p className="text-[9px] text-slate-400 italic">Idade de Desenv.: {Math.floor(idMonths/12)}a {idMonths%12}m</p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="bg-blue-50 p-5 rounded-[1.5rem] border border-blue-100">
+                  <p className="text-xs font-bold text-blue-700 uppercase mb-2 tracking-widest">Parâmetros de Desenvolvimento</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    O Inventário Portage avalia o desenvolvimento global. Os resultados indicam a porcentagem de metas alcançadas em cada área. 
+                    A <strong>Idade de Desenvolvimento (ID)</strong> é comparada com a idade cronológica para identificar possíveis atrasos ou áreas de potencialidade.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* EOCA */}
+        {latestEoca && (
+          <section className="space-y-6 break-inside-avoid">
+            <div className="flex justify-between items-end border-b border-slate-100 pb-2">
+              <h2 className="text-xl font-black text-amber-600 uppercase tracking-tight">4. Entrevista Operativa (EOCA)</h2>
+              <p className="text-xs font-bold text-slate-400 italic">Avaliação do Vínculo com a Aprendizagem</p>
+            </div>
+            <div className="grid grid-cols-1 gap-6">
+              <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100">
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-2">Modalidade de Aprendizagem Predominante</p>
+                <p className="text-2xl font-black text-amber-900 capitalize">{latestEoca.learningModality}</p>
+                <p className="text-xs text-amber-600 mt-2 italic">
+                  {latestEoca.learningModality === 'hipoassimilativa' ? 'Pobreza no contato com o objeto, dificuldade em internalizar.' :
+                   latestEoca.learningModality === 'hiperassimilativa' ? 'Predomínio da imaginação, dificuldade em focar no real.' :
+                   latestEoca.learningModality === 'hipoacomodativa' ? 'Dificuldade em transformar o conhecimento, rigidez.' :
+                   'Excesso de imitação, falta de criatividade própria.'}
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {['thematic', 'dynamic', 'product'].map(cat => (
+                  <div key={cat} className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                    <h3 className="font-black text-slate-900 mb-3 uppercase text-[10px] tracking-widest flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      {cat === 'thematic' ? 'Temática' : cat === 'dynamic' ? 'Dinâmica' : 'Produto'}
+                    </h3>
+                    <div className="space-y-3">
+                      {Array.isArray(latestEoca[cat as keyof typeof latestEoca]) && (latestEoca[cat as keyof typeof latestEoca] as string[]).length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {(latestEoca[cat as keyof typeof latestEoca] as string[]).map((item: string) => (
+                            <span key={item} className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-lg text-slate-600">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {latestEoca[`${cat}Obs` as keyof typeof latestEoca] && (
+                        <p className="text-xs text-slate-500 italic leading-relaxed pt-2 border-t border-slate-200/50">
+                          {latestEoca[`${cat}Obs` as keyof typeof latestEoca] as string}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-slate-900 p-6 rounded-[2rem] text-white">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Conclusões e Hipóteses Diagnósticas</p>
+                <p className="text-sm leading-relaxed text-slate-300 whitespace-pre-wrap">{latestEoca.conclusions}</p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* PTI */}
+        {latestPti && (
+          <section className="space-y-6 break-inside-avoid">
+            <div className="flex justify-between items-end border-b border-slate-100 pb-2">
+              <h2 className="text-xl font-black text-emerald-600 uppercase tracking-tight">5. Plano Terapêutico Individual (PTI)</h2>
+              <div className="flex gap-4 text-[9px] font-bold uppercase tracking-widest">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-slate-300" />
+                  <span className="text-slate-400">Pendente</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span className="text-amber-600">Em Andamento</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-emerald-600">Concluído</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Frequência</p>
+                <p className="text-sm font-bold text-slate-700">{latestPti.frequencia || 'N/A'}</p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Duração</p>
+                <p className="text-sm font-bold text-slate-700">{latestPti.duracao || 'N/A'}</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase mb-2">Objetivos Terapêuticos</p>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{latestPti.objetivos || 'N/A'}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase mb-2">Áreas de Foco e Legenda</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {PTI_AREAS.map(area => {
+                    const isActive = latestPti.areas_foco?.includes(area.label) || false;
+                    return (
+                      <div key={area.id} className={cn(
+                        "p-3 rounded-xl border transition-all",
+                        isActive ? "bg-white border-slate-200 shadow-sm" : "bg-slate-50/50 border-transparent opacity-40"
+                      )}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: area.color }} />
+                          <p className="text-xs font-bold text-slate-700">{area.label}</p>
+                        </div>
+                        <p className="text-[10px] text-slate-500 italic">{area.desc}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase mb-2">Estratégias</p>
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{latestPti.estrategias || 'N/A'}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase mb-2">Recursos</p>
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{latestPti.recursos || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Photos and Evolutions */}
+        {evolutions && evolutions.length > 0 && (
+          <section className="space-y-6 break-inside-avoid">
+            <h2 className="text-xl font-black text-slate-900 border-l-4 border-slate-900 pl-4 uppercase tracking-tight">Histórico de Evolução</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {evolutions.slice(-4).map((ev) => (
+                <div key={ev.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-white px-2 py-1 rounded-lg">
+                      {ev.type === 'abc' ? 'Registro ABC' : 'Sessão'} • {formatDate(ev.date)}
+                    </span>
+                  </div>
+                  {ev.type === 'abc' ? (
+                    <div className="space-y-2 text-[11px]">
+                      <p className="text-slate-600"><strong className="text-slate-900 uppercase text-[9px]">Antecedente:</strong> {ev.abc?.antecedent}</p>
+                      <p className="text-slate-600"><strong className="text-slate-900 uppercase text-[9px]">Comportamento:</strong> {ev.abc?.behavior}</p>
+                      <p className="text-slate-600"><strong className="text-slate-900 uppercase text-[9px]">Consequência:</strong> {ev.abc?.consequence}</p>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-600 whitespace-pre-wrap leading-relaxed italic line-clamp-4">{ev.content}</p>
+                  )}
+                  {ev.photo && (
+                    <div className="mt-4">
+                      <img src={ev.photo} className="w-full h-32 object-cover rounded-xl border border-white shadow-sm" alt="Anexo" referrerPolicy="no-referrer" />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Footer */}
+        <div className="pt-20 border-t border-slate-100 text-center space-y-10">
+          <div className="inline-block border-t-2 border-slate-900 pt-4 px-20">
+            <p className="font-black text-slate-900 uppercase tracking-tighter">{profName}</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{profSpecialty}</p>
+            <p className="text-[10px] text-slate-400">{profCRP}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-[10px] text-slate-300 uppercase tracking-[0.3em] font-bold">Gerado por Caderno Psicopedagógico Avançado</p>
+            <p className="text-[9px] text-slate-200 italic">Este documento é confidencial e seu conteúdo é de responsabilidade do profissional emissor.</p>
+          </div>
+        </div>
+
+        {/* Print Controls */}
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex gap-4 print:hidden z-[110]">
+          <button 
+            onClick={onClose}
+            className="bg-white text-slate-600 font-black px-6 py-4 rounded-2xl shadow-2xl border border-slate-200 flex items-center gap-2 hover:bg-slate-50 transition-all active:scale-95"
+          >
+            <X size={20} />
+            <span className="hidden sm:inline">Fechar</span>
+          </button>
+          <button 
+            onClick={handleShare}
+            className="bg-brand-50 text-brand-600 font-black px-6 py-4 rounded-2xl shadow-2xl border border-brand-100 flex items-center gap-2 hover:bg-brand-100 transition-all active:scale-95"
+          >
+            <Share2 size={20} />
+            <span className="hidden sm:inline">Compartilhar</span>
+          </button>
+          <button 
+            onClick={handlePrint}
+            className="bg-slate-900 text-white font-black px-10 py-4 rounded-2xl shadow-2xl flex items-center gap-2 hover:bg-slate-800 transition-all active:scale-95"
+          >
+            <Printer size={20} />
+            <span>Salvar</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

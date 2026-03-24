@@ -1,0 +1,7 @@
+{
+  "name": "Evolução Psicopedagógica",
+  "description": "Sistema de gestão psicopedagógica para crianças autistas - Prof. Daniele Rodrigues",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

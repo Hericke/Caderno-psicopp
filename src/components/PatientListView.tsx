@@ -36,7 +36,7 @@ export function PatientListView({ onSelectPatient, onAddPatient }: { onSelectPat
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50">
+    <div className="flex flex-col bg-slate-50">
       <header className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-100 h-16 flex items-center px-6 z-40 justify-between">
         <h1 className="text-xl font-display font-bold text-slate-900">Pacientes</h1>
         <button onClick={onAddPatient} className="md:hidden p-2 text-brand-600 hover:bg-brand-50 rounded-full transition-colors">

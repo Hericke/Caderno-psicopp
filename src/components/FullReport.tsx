@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Patient } from '../db';
 import { formatDate, calculateAge, cn } from '../lib/utils';
@@ -6,9 +6,11 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
-import { Share2, Printer, X, ArrowLeft, User, Calendar, Phone, Users, ClipboardCheck, Brain, Activity, Heart, Target, History, Copy } from 'lucide-react';
+import { Share2, Printer, X, ArrowLeft, User, Calendar, Phone, Users, ClipboardCheck, Brain, Activity, Heart, Target, History, Copy, Loader2, Download } from 'lucide-react';
 import { PORTAGE_ITEMS } from '../constants';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const AREA_COLORS: Record<string, string> = {
   'Socialização': '#3b82f6',
@@ -29,6 +31,8 @@ const PTI_AREAS = [
 ];
 
 export function FullReport({ patient, onClose }: { patient: Patient, onClose: () => void }) {
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const iar = useLiveQuery(() => db.iar.where('patientId').equals(patient.id!).toArray(), [patient.id]);
   const portage = useLiveQuery(() => db.portage.where('patientId').equals(patient.id!).toArray(), [patient.id]);
   const eoca = useLiveQuery(() => db.eoca.where('patientId').equals(patient.id!).toArray(), [patient.id]);
@@ -59,55 +63,93 @@ export function FullReport({ patient, onClose }: { patient: Patient, onClose: ()
     return Math.round(totalMonths);
   };
 
+  const generatePDFBlob = async (): Promise<Blob | null> => {
+    if (!reportRef.current) return null;
+    
+    setIsGenerating(true);
+    const toastId = toast.loading('Gerando PDF profissional...');
+    
+    try {
+      const element = reportRef.current;
+      
+      // Use a higher scale for better quality
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight,
+        onclone: (clonedDoc) => {
+          const controls = clonedDoc.querySelectorAll('.print-controls');
+          controls.forEach(c => (c as HTMLElement).style.display = 'none');
+        }
+      });
+      
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      let heightLeft = pdfHeight;
+      let position = 0;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft >= 0) {
+        position = heightLeft - pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      toast.dismiss(toastId);
+      return pdf.output('blob');
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast.error('Falha ao gerar PDF. Tente novamente.');
+      toast.dismiss(toastId);
+      return null;
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleShare = async () => {
-    const iarTotal = latestIar ? Object.values(latestIar.items).reduce((acc, val) => acc + val, 0) : 0;
-    const iarMax = 6;
-    const iarPercent = ((iarTotal / iarMax) * 100).toFixed(1);
+    const blob = await generatePDFBlob();
+    if (!blob) return;
 
-    const text = `
-Relatório Psicopedagógico - ${patient.name}
-Data: ${new Date().toLocaleDateString('pt-BR')}
-
-Paciente: ${patient.name}
-Idade: ${calculateAge(patient.birthDate)} anos
-Responsável: ${patient.parents}
-Contato: ${patient.contact}
-CID: ${patient.cid}
-
-Resumo da Avaliação:
-- IAR: ${latestIar ? `Realizado (${iarPercent}% de prontidão)` : 'Não realizado'}
-- Portage: ${latestPortage ? 'Realizado (Avaliação global concluída)' : 'Não realizado'}
-- EOCA: ${latestEoca ? 'Concluído (Vínculo com aprendizagem avaliado)' : 'Pendente'}
-- PTI: ${latestPti ? 'Plano Terapêutico definido' : 'Não definido'}
-
-Profissional: ${profName}
-${profSpecialty} ${profCRP}
-
-Documento gerado pelo Caderno Psicopedagógico Avançado.
-    `.trim();
+    const fileName = `Relatorio_${patient.name.replace(/\s+/g, '_')}.pdf`;
+    const file = new File([blob], fileName, { type: 'application/pdf' });
 
     try {
-      if (navigator.share && /mobile/i.test(navigator.userAgent)) {
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
+          files: [file],
           title: `Relatório - ${patient.name}`,
-          text: text,
-          url: window.location.href
+          text: `Segue em anexo o relatório psicopedagógico de ${patient.name}.`
         });
         toast.success('Relatório compartilhado com sucesso!');
       } else {
-        await navigator.clipboard.writeText(text);
-        toast.success('Relatório copiado para a área de transferência!', {
-          description: 'Você pode colar no WhatsApp ou E-mail.'
-        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('PDF baixado com sucesso!');
       }
     } catch (err) {
       console.error('Erro ao compartilhar:', err);
-      try {
-        await navigator.clipboard.writeText(text);
-        toast.success('Relatório copiado para a área de transferência!');
-      } catch (clipErr) {
-        toast.error('Não foi possível copiar o relatório.');
-        console.error('Erro ao copiar:', clipErr);
+      if ((err as Error).name !== 'AbortError') {
+        toast.error('Não foi possível compartilhar o arquivo.');
       }
     }
   };
@@ -130,19 +172,30 @@ Documento gerado pelo Caderno Psicopedagógico Avançado.
     color: AREA_COLORS[area] || '#cbd5e1'
   })) : [];
 
-  const handlePrint = () => {
-    toast.info('Preparando relatório para impressão...', { duration: 2000 });
-    setTimeout(() => {
-      window.print();
-    }, 500);
+  const handlePrint = async () => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      const blob = await generatePDFBlob();
+      if (!blob) return;
+      
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      toast.info('O PDF foi aberto em uma nova aba para visualização.');
+    } else {
+      toast.info('Preparando relatório para impressão...', { duration: 2000 });
+      setTimeout(() => {
+        window.print();
+      }, 800);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-white z-[100] overflow-auto p-8 print:p-0 print:static print:overflow-visible">
-      <div className="max-w-4xl mx-auto space-y-12 pb-20 print:pb-0">
+    <div className="fixed inset-0 bg-white z-[100] overflow-auto p-4 sm:p-8 print:p-0 print:static print:overflow-visible">
+      <div ref={reportRef} className="max-w-4xl mx-auto space-y-8 sm:space-y-12 pb-20 print:pb-0 bg-white">
         
         {/* Top Controls (Mobile Friendly) */}
-        <div className="flex justify-between items-center mb-8 print:hidden">
+        <div className="flex justify-between items-center mb-4 sm:mb-8 print:hidden print-controls">
           <button 
             onClick={onClose}
             className="p-2 hover:bg-slate-100 rounded-full transition-colors"
@@ -152,28 +205,30 @@ Documento gerado pelo Caderno Psicopedagógico Avançado.
           <div className="flex gap-2">
             <button 
               onClick={handleShare}
-              className="p-3 bg-brand-50 text-brand-600 rounded-2xl hover:bg-brand-100 transition-all"
-              title="Compartilhar"
+              disabled={isGenerating}
+              className="p-3 bg-brand-50 text-brand-600 rounded-2xl hover:bg-brand-100 transition-all disabled:opacity-50"
+              title="Compartilhar PDF"
             >
-              <Share2 size={20} />
+              {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <Share2 size={20} />}
             </button>
             <button 
               onClick={handlePrint}
-              className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all"
-              title="Salvar"
+              disabled={isGenerating}
+              className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all disabled:opacity-50"
+              title="Salvar/Imprimir"
             >
-              <Printer size={20} />
+              {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <Printer size={20} />}
             </button>
           </div>
         </div>
 
         {/* Header */}
-        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start border-b-2 border-slate-900 pb-6 gap-4">
           <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-slate-900 uppercase tracking-tighter">Relatório Psicopedagógico</h1>
-            <p className="text-slate-500 font-medium italic">Documento Confidencial de Avaliação e Intervenção</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 uppercase tracking-tighter">Relatório Psicopedagógico</h1>
+            <p className="text-slate-500 font-medium italic text-sm sm:text-base">Documento Confidencial de Avaliação e Intervenção</p>
           </div>
-          <div className="text-right">
+          <div className="text-left sm:text-right">
             <p className="font-bold text-slate-800">{profName}</p>
             <p className="text-sm text-slate-500">{profSpecialty}</p>
             <p className="text-sm text-slate-500">{profCRP}</p>
@@ -181,11 +236,11 @@ Documento gerado pelo Caderno Psicopedagógico Avançado.
         </div>
 
         {/* Patient Info */}
-        <section className="grid grid-cols-2 gap-8 bg-slate-50 p-8 rounded-[2rem] border border-slate-100">
-          <div className="space-y-6">
+        <section className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 bg-slate-50 p-6 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100">
+          <div className="space-y-4 sm:space-y-6">
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Paciente</p>
-              <p className="text-2xl font-black text-slate-900">{patient.name}</p>
+              <p className="text-xl sm:text-2xl font-black text-slate-900">{patient.name}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -202,7 +257,7 @@ Documento gerado pelo Caderno Psicopedagógico Avançado.
               <p className="font-bold text-slate-700">{patient.parents || 'Não informado'}</p>
             </div>
           </div>
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Contato</p>
               <p className="font-bold text-slate-700">{patient.contact || 'Não informado'}</p>
@@ -515,28 +570,36 @@ Documento gerado pelo Caderno Psicopedagógico Avançado.
         </div>
 
         {/* Print Controls */}
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex gap-4 print:hidden z-[110]">
-          <button 
-            onClick={onClose}
-            className="bg-white text-slate-600 font-black px-6 py-4 rounded-2xl shadow-2xl border border-slate-200 flex items-center gap-2 hover:bg-slate-50 transition-all active:scale-95"
-          >
-            <X size={20} />
-            <span className="hidden sm:inline">Fechar</span>
-          </button>
-          <button 
-            onClick={handleShare}
-            className="bg-brand-50 text-brand-600 font-black px-6 py-4 rounded-2xl shadow-2xl border border-brand-100 flex items-center gap-2 hover:bg-brand-100 transition-all active:scale-95"
-          >
-            <Share2 size={20} />
-            <span className="hidden sm:inline">Compartilhar</span>
-          </button>
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex flex-col sm:flex-row gap-3 sm:gap-4 print:hidden z-[110] w-[90%] sm:w-auto print-controls">
+          <div className="flex gap-2 sm:gap-4 w-full sm:w-auto">
+            <button 
+              onClick={onClose}
+              disabled={isGenerating}
+              className="flex-1 sm:flex-none bg-white text-slate-600 font-black px-4 sm:px-6 py-4 rounded-2xl shadow-2xl border border-slate-200 flex items-center justify-center gap-2 hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <X size={20} />
+              <span className="hidden sm:inline">Fechar</span>
+            </button>
+            <button 
+              onClick={handleShare}
+              disabled={isGenerating}
+              className="flex-1 sm:flex-none bg-brand-50 text-brand-600 font-black px-4 sm:px-6 py-4 rounded-2xl shadow-2xl border border-brand-100 flex items-center justify-center gap-2 hover:bg-brand-100 transition-all active:scale-95 disabled:opacity-50"
+            >
+              {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <Share2 size={20} />}
+              <span className="hidden sm:inline">Compartilhar</span>
+            </button>
+          </div>
           <button 
             onClick={handlePrint}
-            className="bg-slate-900 text-white font-black px-10 py-4 rounded-2xl shadow-2xl flex items-center gap-2 hover:bg-slate-800 transition-all active:scale-95"
+            disabled={isGenerating}
+            className="w-full sm:w-auto bg-slate-900 text-white font-black px-10 py-4 rounded-2xl shadow-2xl flex items-center justify-center gap-2 hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
           >
-            <Printer size={20} />
-            <span>Salvar</span>
+            {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <Printer size={20} />}
+            <span>{/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 'Visualizar PDF' : 'Salvar PDF'}</span>
           </button>
+          <p className="sm:hidden text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+            {isGenerating ? 'Processando relatório...' : 'Dica: Gere o PDF para compartilhar ou imprimir'}
+          </p>
         </div>
       </div>
     </div>

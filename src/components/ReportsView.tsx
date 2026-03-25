@@ -21,7 +21,7 @@ export function ReportsView() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 pb-20">
+    <div className="flex flex-col bg-slate-50">
       <header className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-100 h-16 flex items-center px-6 z-40">
         <h1 className="text-xl font-display font-bold text-slate-900">Relatórios Profissionais</h1>
       </header>

@@ -140,7 +140,7 @@ export default function App() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-h-screen relative">
         <Toaster position="top-center" richColors />
-        <div className="flex-1 overflow-y-auto pb-20 md:pb-8">
+        <div className="flex-1 overflow-y-auto pb-24 md:pb-8">
           <div className="max-w-6xl mx-auto w-full h-full">
             <AnimatePresence mode="wait">
               {renderContent()}

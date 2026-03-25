@@ -13,12 +13,22 @@
 }
 
 @layer base {
+  html, body, #root {
+    height: 100dvh;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
   body {
     @apply antialiased text-slate-900 bg-slate-50;
   }
   
   h1, h2, h3, h4 {
     @apply font-display tracking-tight;
+  }
+
+  input, button, select, textarea {
+    min-height: 44px;
   }
 
   .no-scrollbar::-webkit-scrollbar {
@@ -42,23 +52,73 @@
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+
   body {
     background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
     padding: 0 !important;
+    margin: 0 !important;
   }
-  nav, header, button, .no-print {
+
+  /* Hide UI elements */
+  nav, header, button, .no-print, [role="navigation"], .print\:hidden {
     display: none !important;
   }
-  .print-only {
+
+  /* Ensure the report container is visible and full width */
+  .fixed.inset-0 {
+    position: static !important;
     display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: white !important;
+    width: 100% !important;
+    height: auto !important;
   }
-  .page-break {
-    page-break-before: always;
+
+  .max-w-4xl {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-  .card {
-    border: 1px solid #eee !important;
-    box-shadow: none !important;
+
+  /* Force charts to be visible and have correct dimensions */
+  .recharts-responsive-container {
+    width: 100% !important;
+    height: 300px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* Prevent elements from breaking across pages awkwardly */
+  section, .break-inside-avoid, .card {
     break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 2rem !important;
+    padding: 1.5rem !important;
+    border-radius: 1rem !important;
+    border: 1px solid #f1f5f9 !important;
+    background: #f8fafc !important;
+    box-shadow: none !important;
+  }
+
+  h1, h2, h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+    color: #0f172a !important;
+  }
+
+  /* Fix for mobile print preview */
+  .overflow-auto {
+    overflow: visible !important;
   }
 }
 

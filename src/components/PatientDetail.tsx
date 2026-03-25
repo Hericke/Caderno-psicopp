@@ -157,7 +157,7 @@ Documento gerado pelo Caderno Psicopedagógico Avançado.
           </button>
           <button 
             onClick={handlePrint}
-            className="btn-primary flex items-center gap-2 px-4 py-2 text-sm shadow-lg shadow-brand-100"
+            className="btn-primary flex items-center gap-2 px-5 py-3 text-sm shadow-lg shadow-brand-100"
           >
             <Printer size={18} />
             <span className="hidden sm:inline">Salvar</span>
@@ -593,7 +593,7 @@ function PatientInfoTab({ patient }: { patient: any }) {
             </div>
             <button 
               onClick={handleWhatsApp}
-              className="w-full flex items-center justify-center gap-2 bg-emerald-500 text-white font-bold py-3 rounded-2xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100"
+              className="w-full flex items-center justify-center gap-2 bg-emerald-500 text-white font-bold py-4 rounded-2xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100"
             >
               <MessageSquare size={20} />
               Abrir no WhatsApp

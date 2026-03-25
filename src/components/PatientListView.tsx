@@ -144,13 +144,13 @@ export function PatientListView({ onSelectPatient, onAddPatient }: { onSelectPat
             <div className="flex gap-3">
               <button 
                 onClick={() => setPatientToDelete(null)}
-                className="flex-1 py-3 font-bold text-slate-500 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors"
+                className="flex-1 py-4 font-bold text-slate-500 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors"
               >
                 Cancelar
               </button>
               <button 
                 onClick={handleDelete}
-                className="flex-1 py-3 font-bold text-white bg-red-500 rounded-2xl hover:bg-red-600 transition-colors shadow-lg shadow-red-100"
+                className="flex-1 py-4 font-bold text-white bg-red-500 rounded-2xl hover:bg-red-600 transition-colors shadow-lg shadow-red-100"
               >
                 Excluir
               </button>

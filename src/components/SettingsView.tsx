@@ -240,7 +240,7 @@ export function SettingsView() {
               <div className="flex gap-3">
                 <button 
                   onClick={() => setConfirmAction(null)}
-                  className="flex-1 py-3 font-bold text-slate-500 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors"
+                  className="flex-1 py-4 font-bold text-slate-500 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -253,7 +253,7 @@ export function SettingsView() {
                     }
                     setConfirmAction(null);
                   }}
-                  className="flex-1 py-3 font-bold text-white bg-red-500 rounded-2xl hover:bg-red-600 transition-colors shadow-lg shadow-red-100"
+                  className="flex-1 py-4 font-bold text-white bg-red-500 rounded-2xl hover:bg-red-600 transition-colors shadow-lg shadow-red-100"
                 >
                   Confirmar
                 </button>
@@ -274,7 +274,7 @@ export function SettingsView() {
               </p>
               <button 
                 onClick={() => setAlertMessage(null)}
-                className="w-full py-3 font-bold text-white bg-brand-600 rounded-2xl hover:bg-brand-700 transition-colors"
+                className="w-full py-4 font-bold text-white bg-brand-600 rounded-2xl hover:bg-brand-700 transition-colors"
               >
                 OK
               </button>

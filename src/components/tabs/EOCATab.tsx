@@ -288,7 +288,7 @@ export function EOCATab({ patientId }: { patientId: number }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {latest ? (
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
           <div className="flex justify-between items-center">

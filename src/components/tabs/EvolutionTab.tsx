@@ -56,7 +56,7 @@ export function EvolutionTab({ patientId }: { patientId: number }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {/* Delete Confirmation Modal */}
       {deleteId !== null && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">

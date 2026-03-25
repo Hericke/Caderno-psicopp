@@ -204,7 +204,7 @@ export function PTITab({ patientId }: { patientId: number }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       <AnimatePresence mode="wait">
         {latest ? (
           <motion.div 

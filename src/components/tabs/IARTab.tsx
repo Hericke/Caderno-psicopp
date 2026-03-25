@@ -439,7 +439,7 @@ export function IARTab({ patientId }: { patientId: number }) {
   })) : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {latest ? (
         <div className="space-y-6">
           {/* Result Card */}

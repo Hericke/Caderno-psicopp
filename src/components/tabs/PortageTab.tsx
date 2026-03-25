@@ -150,7 +150,7 @@ export function PortageTab({ patientId }: { patientId: number }) {
   })) : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {latest ? (
         <div className="space-y-6">
           {/* Chart Card */}

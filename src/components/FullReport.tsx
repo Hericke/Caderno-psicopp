@@ -110,22 +110,34 @@ export function FullReport({ patient, onClose }: { patient: Patient, onClose: ()
             * {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
+              box-shadow: none !important;
+              text-shadow: none !important;
             }
             .glass-card {
               backdrop-filter: none !important;
               -webkit-backdrop-filter: none !important;
               background-color: rgba(255, 255, 255, 0.95) !important;
             }
-            /* Fallback for any oklch that might have slipped through */
-            [class*="shadow"] {
-              box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
-            }
+            /* Explicit hex overrides for common classes used in the report */
             [class*="bg-slate-50"] { background-color: #f8fafc !important; }
+            [class*="bg-purple-50"] { background-color: #faf5ff !important; }
+            [class*="bg-blue-50"] { background-color: #eff6ff !important; }
+            [class*="bg-white"] { background-color: #ffffff !important; }
+            
             [class*="text-slate-900"] { color: #0f172a !important; }
+            [class*="text-slate-700"] { color: #334155 !important; }
+            [class*="text-slate-600"] { color: #475569 !important; }
             [class*="text-slate-500"] { color: #64748b !important; }
             [class*="text-slate-400"] { color: #94a3b8 !important; }
-            [class*="text-slate-700"] { color: #334155 !important; }
+            
+            [class*="text-purple-600"] { color: #9333ea !important; }
+            [class*="text-purple-700"] { color: #7e22ce !important; }
+            [class*="text-blue-600"] { color: #2563eb !important; }
+            [class*="text-blue-700"] { color: #1d4ed8 !important; }
+            
             [class*="border-slate-100"] { border-color: #f1f5f9 !important; }
+            [class*="border-purple-100"] { border-color: #f3e8ff !important; }
+            [class*="border-blue-100"] { border-color: #dbeafe !important; }
           `;
           clonedDoc.head.appendChild(style);
         }
